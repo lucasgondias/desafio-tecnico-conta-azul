@@ -59,3 +59,14 @@ dataform/node_modules/
 *.tmp
 *.log
 *.bak
+
+# Documentation (keep only essential files)
+RESUMO_EXECUTIVO.md
+COMO_USAR.md
+INDICE.md
+PERGUNTAS_FREQUENTES_TECNICAS.md
+CHECKLIST_APRESENTACAO.md
+GITHUB_SETUP.md
+CLAUDE.md
+docs/APRESENTACAO.md
+desafio.md
