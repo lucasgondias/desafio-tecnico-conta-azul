@@ -291,28 +291,28 @@ graph TB
 
 ```mermaid
 graph TB
-    subgraph "IAM & Access Control"
-        I1[Service Accounts<br/>dataform@, airflow@]
-        I2[Groups<br/>revops-analysts@<br/>data-science@]
-        I3[Row-Level Security<br/>BigQuery Policies]
+    subgraph IAM["IAM & Access Control"]
+        I1[Service Accounts]
+        I2[Groups]
+        I3[Row-Level Security]
     end
 
-    subgraph "Data Classification"
+    subgraph DC["Data Classification"]
         C1[Dataplex Taxonomy]
-        C2[Policy Tags<br/>PII, Sensitive]
-        C3[DLP Scanning<br/>Auto-detection]
+        C2[Policy Tags]
+        C3[DLP Scanning]
     end
 
-    subgraph "Audit & Compliance"
-        A1[Cloud Audit Logs<br/>Quem acessou o quê?]
-        A2[BigQuery Query Logs<br/>Histórico de queries]
-        A3[Data Lineage<br/>Origem → Destino]
+    subgraph AC["Audit & Compliance"]
+        A1[Cloud Audit Logs]
+        A2[BigQuery Query Logs]
+        A3[Data Lineage]
     end
 
-    subgraph "Data Catalog"
-        D1[Metadados Técnicos<br/>Schema, Types]
-        D2[Metadados de Negócio<br/>Descrições, Owners]
-        D3[Search & Discovery<br/>Self-Service]
+    subgraph CAT["Data Catalog"]
+        D1[Metadados Técnicos]
+        D2[Metadados de Negócio]
+        D3[Search & Discovery]
     end
 
     I2 --> I3
@@ -334,23 +334,23 @@ graph TB
 
 ```mermaid
 graph LR
-    subgraph "Estratégias de Otimização"
-        O1[Particionamento<br/>por Data]
-        O2[Clustering<br/>por Filtros Comuns]
-        O3[BigQuery<br/>BI Engine Cache]
-        O4[Materialized Views<br/>Queries Pesadas]
+    subgraph OPT["Estratégias de Otimização"]
+        O1[Particionamento]
+        O2[Clustering]
+        O3[BI Engine Cache]
+        O4[Materialized Views]
     end
 
-    subgraph "Monitoramento de Custo"
-        M1[Query Cost<br/>Tracking]
-        M2[Storage<br/>Lifecycle Policies]
-        M3[Alerts<br/>Budget Thresholds]
+    subgraph MON["Monitoramento"]
+        M1[Query Cost Tracking]
+        M2[Lifecycle Policies]
+        M3[Budget Alerts]
     end
 
-    subgraph "Impacto"
-        R1[Redução de<br/>Scans: 80-90%]
-        R2[Queries Repetitivas:<br/>Free]
-        R3[Storage Cost:<br/>-75% após 90d]
+    subgraph IMP["Impacto"]
+        R1[Redução 80-90%]
+        R2[Cache Queries]
+        R3[Storage -75%]
     end
 
     O1 --> R1
@@ -371,22 +371,22 @@ graph LR
 
 ```mermaid
 graph TB
-    subgraph "Camada de Proteção"
-        P1[Cloud Storage<br/>Versioning Enabled]
-        P2[BigQuery<br/>Time Travel 7 dias]
-        P3[Snapshots<br/>Tabelas Críticas]
+    subgraph PROT["Proteção"]
+        P1[Storage Versioning]
+        P2[Time Travel 7d]
+        P3[Snapshots]
     end
 
-    subgraph "Recovery Procedures"
-        R1[Restore from<br/>Cloud Storage Version]
-        R2[Query Historical<br/>State BigQuery]
-        R3[Restore from<br/>Snapshot]
+    subgraph REC["Recovery"]
+        R1[Restore Storage]
+        R2[Query Historical]
+        R3[Restore Snapshot]
     end
 
-    subgraph "Backup Policies"
-        B1[Bronze: 2 anos<br/>Nearline após 90d]
-        B2[Silver: 5 anos<br/>Coldline após 1 ano]
-        B3[Gold: Indefinido<br/>Snapshots mensais]
+    subgraph POL["Policies"]
+        B1[Bronze: 2 anos]
+        B2[Silver: 5 anos]
+        B3[Gold: Indefinido]
     end
 
     P1 --> R1
