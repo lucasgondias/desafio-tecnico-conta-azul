@@ -48,53 +48,55 @@ A solução utiliza **Google Cloud Platform (GCP)** pela sua integração nativa
                       │
               ┌───────▼────────┐
               │  INGESTÃO      │
-              │                │
-              │ • Fivetran     │────────┐
-              │ • Datastream   │        │
-              │ • Cloud Run    │        │
-              └───────┬────────┘        │
-                      │                 │
-       ┌──────────────▼─────────────────▼────────────────┐
-       │         CLOUD STORAGE (Data Lake)                │
-       │                                                  │
-       │  ┌─────────────────────────────────────────┐    │
-       │  │  BRONZE LAYER (Raw Data)                │    │
-       │  │  • Formato: Avro/Parquet                │    │
-       │  │  • Particionado por data ingestão       │    │
-       │  └──────────────┬──────────────────────────┘    │
-       │                 │                                │
-       │  ┌──────────────▼──────────────────────────┐    │
-       │  │  SILVER LAYER (Cleaned & Conformed)     │    │
-       │  │  • Dados limpos e padronizados          │    │
-       │  │  • Type casting e validações            │    │
-       │  └──────────────┬──────────────────────────┘    │
-       │                 │                                │
-       │  ┌──────────────▼──────────────────────────┐    │
-       │  │  GOLD LAYER (Business Ready)            │    │
-       │  │  • Modelos dimensionais                 │    │
-       │  │  • Agregações e métricas                │    │
-       │  └─────────────────────────────────────────┘    │
-       └──────────────────────────────────────────────────┘
+              │  • Datastream  │
+              │  • Fivetran    │
+              │  • Cloud Run   │
+              └───────┬────────┘
                       │
-       ┌──────────────▼─────────────────────────────┐
-       │        BIGQUERY (Data Warehouse)           │
-       │                                            │
-       │  ┌────────────────┐  ┌──────────────────┐ │
-       │  │ Product        │  │ Revenue Ops      │ │
-       │  │ Analytics      │  │ (RevOps)         │ │
-       │  └────────────────┘  └──────────────────┘ │
-       │  ┌────────────────────────────────────┐   │
-       │  │ Data Science (Feature Store)       │   │
-       │  └────────────────────────────────────┘   │
-       └──────────────┬─────────────────────────────┘
+       ┌──────────────▼─────────────────┐
+       │  CLOUD STORAGE (Data Lake)     │
+       │  ┌──────────────────────────┐  │
+       │  │  BRONZE LAYER            │  │
+       │  │  • Parquet/Avro files    │  │
+       │  │  • Imutável (append-only)│  │
+       │  └──────────────┬───────────┘  │
+       └─────────────────┼───────────────┘
+                         │ BigLake External Tables
+       ┌─────────────────▼────────────────────────────┐
+       │        BIGQUERY (Data Warehouse)             │
+       │                                              │
+       │  ┌────────────────────────────────────────┐ │
+       │  │  SILVER LAYER (Datasets: silver_*)     │ │
+       │  │  • BigQuery Materialized Tables        │ │
+       │  │  • Particionamento + Clustering        │ │
+       │  │  • Type casting correto                │ │
+       │  └──────────────┬─────────────────────────┘ │
+       │                 │                            │
+       │  ┌──────────────▼─────────────────────────┐ │
+       │  │  GOLD LAYER (Datasets: gold_*)         │ │
+       │  │                                        │ │
+       │  │  ┌────────────────────────────────┐   │ │
+       │  │  │ gold_product_analytics/        │   │ │
+       │  │  │ (Owner: Product Analytics)     │   │ │
+       │  │  └────────────────────────────────┘   │ │
+       │  │  ┌────────────────────────────────┐   │ │
+       │  │  │ gold_revenue_ops/              │   │ │
+       │  │  │ (Owner: RevOps Team)           │   │ │
+       │  │  └────────────────────────────────┘   │ │
+       │  │  ┌────────────────────────────────┐   │ │
+       │  │  │ gold_data_science/             │   │ │
+       │  │  │ (Owner: Data Science Team)     │   │ │
+       │  │  └────────────────────────────────┘   │ │
+       │  └────────────────────────────────────────┘ │
+       └──────────────┬───────────────────────────────┘
                       │
        ┌──────────────┴─────────────────────────────┐
        │                                            │
 ┌──────▼────────┐  ┌──────────┐  ┌────────────────┐
-│  Looker /     │  │ Vertex AI│  │ Data Catalog   │
+│  Looker /     │  │ Vertex AI│  │ Dataplex       │
 │  Looker Studio│  │ Notebooks│  │ (Governança)   │
 └───────────────┘  └──────────┘  └────────────────┘
-    (Analistas)    (Cientistas)   (Todos)
+    (Analistas)    (Cientistas)   (Catalogação)
 ```
 
 ---
@@ -102,8 +104,8 @@ A solução utiliza **Google Cloud Platform (GCP)** pela sua integração nativa
 ## Stack Tecnológica GCP
 
 ### Camada de Armazenamento
-- **Cloud Storage**: Data Lake (Bronze/Silver/Gold layers)
-- **BigQuery**: Data Warehouse serverless e analytics engine
+- **Cloud Storage**: Data Lake para Bronze Layer (dados raw em Parquet/Avro)
+- **BigQuery**: Data Warehouse serverless - Silver e Gold Layers (tabelas materializadas)
 - **Dataplex**: Governança, catalogação e gerenciamento de metadados
 
 ### Camada de Ingestão
@@ -205,7 +207,7 @@ OPTIONS (
 ```
 
 ### Silver Layer (Cleaned & Conformed)
-**Localização**: `BigQuery dataset: silver_*` + backup em `gs://conta-azul-datalake/silver/`
+**Localização**: `BigQuery datasets: silver_*` (tabelas materializadas)
 
 **Características**:
 - Dados limpos, padronizados e deduplificados
@@ -1903,7 +1905,7 @@ schedule:
 - [ ] Criar projeto GCP (`conta-azul-prod`)
 - [ ] Configurar billing account e budgets/alerts
 - [ ] Setup IAM roles e service accounts
-- [ ] Criar buckets Cloud Storage (Bronze/Silver)
+- [ ] Criar bucket Cloud Storage (Bronze layer apenas)
 - [ ] Provisionar BigQuery datasets (bronze_*, silver_*, gold_*)
 
 ### Fase 1: Foundation (Semanas 1-2)
