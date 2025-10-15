@@ -1,0 +1,198 @@
+config {
+  type: "table",
+  schema: "gold_revenue_ops",
+  description: `
+    # Fato: Monthly Recurring Revenue (MRR)
+
+    Tabela de fatos que consolida o MRR por mês, segmento de cliente e país.
+
+    ## Definição de Negócio
+    MRR (Monthly Recurring Revenue) é a receita recorrente mensal consolidada,
+    calculada a partir das assinaturas ativas no último dia de cada mês.
+
+    ## Metodologia de Cálculo
+    - **MRR**: Soma de \`monthly_value_brl\` de todas as assinaturas com status 'active'
+    - **ARR Normalizado**: \`annual_value_brl / 12\` (para validação cruzada)
+    - **Growth MoM**: Crescimento mês sobre mês por segmento
+
+    ## Owner & SLA
+    - **Owner**: Revenue Operations Team (revops@contaazul.com)
+    - **SLA**: D+1 (dados disponíveis até 6 AM BRT do dia seguinte)
+    - **Refresh**: Diário via Airflow DAG \`daily_data_pipeline\`
+
+    ## Consumers
+    - Looker Dashboard: "Revenue Operations Overview"
+    - Looker Dashboard: "Executive Summary"
+    - Finance Team: Relatórios mensais de MRR
+    - Data Science: Features para forecast de receita
+
+    ## Quality Checks
+    - MRR nunca pode ser negativo
+    - Growth MoM não deve exceder ±50% (anomalia)
+    - Dados do mês atual são parciais (WIP)
+  `,
+
+  bigquery: {
+    partitionBy: "month",
+    clusterBy: ["customer_segment", "country"]
+  },
+
+  tags: ["daily", "revenue_ops", "critical", "looker"],
+
+  assertions: {
+    nonNull: ["month", "customer_segment", "mrr_brl"],
+    rowConditions: [
+      "mrr_brl >= 0",  -- MRR nunca negativo
+      "month <= CURRENT_DATE()"  -- Não pode ser futuro
+    ]
+  }
+}
+
+-- =============================================
+-- GOLD MART: Monthly Recurring Revenue
+-- =============================================
+
+WITH subscriptions AS (
+  SELECT
+    subscription_id,
+    customer_id,
+    plan_type,
+    status,
+    monthly_value_brl,
+    annual_value_brl,
+    start_date,
+    end_date,
+    created_at,
+    updated_at
+  FROM ${ref("silver_core", "subscriptions")}
+  WHERE status = 'active'  -- Apenas assinaturas ativas
+),
+
+customers AS (
+  SELECT
+    customer_id,
+    customer_segment,
+    country,
+    created_date AS customer_since
+  FROM ${ref("silver_core", "customers")}
+  WHERE is_active = TRUE
+),
+
+-- ========== Agregação Principal ==========
+monthly_aggregation AS (
+  SELECT
+    DATE_TRUNC(s.start_date, MONTH) AS month,
+    c.customer_segment,
+    c.country,
+
+    -- ========== Métricas de Volume ==========
+    COUNT(DISTINCT s.subscription_id) AS active_subscriptions,
+    COUNT(DISTINCT s.customer_id) AS active_customers,
+
+    -- ========== Métricas de Receita ==========
+    SUM(s.monthly_value_brl) AS mrr_brl,
+    SUM(s.annual_value_brl) / 12 AS arr_normalized_brl,
+
+    -- ========== Métricas de Ticket Médio ==========
+    AVG(s.monthly_value_brl) AS avg_subscription_value_brl,
+    APPROX_QUANTILES(s.monthly_value_brl, 100)[OFFSET(50)] AS median_subscription_value_brl,
+
+    -- ========== Distribuição por Tipo de Plano ==========
+    COUNTIF(s.plan_type = 'basic') AS subscriptions_basic,
+    COUNTIF(s.plan_type = 'pro') AS subscriptions_pro,
+    COUNTIF(s.plan_type = 'enterprise') AS subscriptions_enterprise,
+
+    SUM(IF(s.plan_type = 'basic', s.monthly_value_brl, 0)) AS mrr_basic_brl,
+    SUM(IF(s.plan_type = 'pro', s.monthly_value_brl, 0)) AS mrr_pro_brl,
+    SUM(IF(s.plan_type = 'enterprise', s.monthly_value_brl, 0)) AS mrr_enterprise_brl
+
+  FROM subscriptions s
+  INNER JOIN customers c USING (customer_id)
+
+  GROUP BY 1, 2, 3
+),
+
+-- ========== Cálculos de Growth ==========
+with_growth_metrics AS (
+  SELECT
+    *,
+
+    -- ========== Growth MoM (Month over Month) ==========
+    mrr_brl - LAG(mrr_brl) OVER (
+      PARTITION BY customer_segment, country
+      ORDER BY month
+    ) AS mrr_growth_brl,
+
+    SAFE_DIVIDE(
+      mrr_brl - LAG(mrr_brl) OVER (
+        PARTITION BY customer_segment, country
+        ORDER BY month
+      ),
+      LAG(mrr_brl) OVER (
+        PARTITION BY customer_segment, country
+        ORDER BY month
+      )
+    ) AS mrr_growth_pct,
+
+    -- ========== Growth em Active Customers ==========
+    active_customers - LAG(active_customers) OVER (
+      PARTITION BY customer_segment, country
+      ORDER BY month
+    ) AS customer_growth,
+
+    -- ========== Rolling Averages (3 meses) ==========
+    AVG(mrr_brl) OVER (
+      PARTITION BY customer_segment, country
+      ORDER BY month
+      ROWS BETWEEN 2 PRECEDING AND CURRENT ROW
+    ) AS mrr_3m_avg_brl,
+
+    AVG(active_customers) OVER (
+      PARTITION BY customer_segment, country
+      ORDER BY month
+      ROWS BETWEEN 2 PRECEDING AND CURRENT ROW
+    ) AS active_customers_3m_avg
+
+  FROM monthly_aggregation
+),
+
+-- ========== Enriquecimento Final ==========
+final AS (
+  SELECT
+    *,
+
+    -- ========== Flags de Alerta ==========
+    CASE
+      WHEN mrr_growth_pct < -0.1 THEN TRUE  -- Queda > 10%
+      ELSE FALSE
+    END AS is_declining_segment,
+
+    CASE
+      WHEN ABS(mrr_growth_pct) > 0.5 THEN TRUE  -- Variação > 50%
+      ELSE FALSE
+    END AS is_anomaly_growth,
+
+    -- ========== Metadados ==========
+    CURRENT_TIMESTAMP() AS _updated_at,
+    'dataform' AS _created_by,
+    DATE_DIFF(CURRENT_DATE(), month, DAY) AS _days_since_month
+
+  FROM with_growth_metrics
+)
+
+SELECT * FROM final
+ORDER BY month DESC, customer_segment, country
+
+-- =============================================
+-- Post Operations - Testes de Qualidade
+-- =============================================
+
+post_operations {
+  -- Teste: MRR total nunca deve diminuir mais de 20% MoM (anomalia crítica)
+  ASSERT (
+    SELECT COUNT(*)
+    FROM ${self()}
+    WHERE mrr_growth_pct < -0.2
+      AND month >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH)
+  ) = 0 AS "Critical: MRR drop > 20% detected in last 3 months"
+}

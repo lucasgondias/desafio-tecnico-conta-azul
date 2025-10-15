@@ -1,0 +1,146 @@
+config {
+  type: "incremental",
+  schema: "silver_core",
+  name: "customers",
+  uniqueKey: ["customer_id"],
+  description: `
+    Tabela de clientes limpa e normalizada do PostgreSQL.
+
+    **Transformações aplicadas**:
+    - Email normalizado (lowercase, trim)
+    - Deduplicação por ID (última versão)
+    - Validação de campos obrigatórios
+    - Type casting adequado
+
+    **Atualização**: Incremental (apenas registros novos/modificados)
+    **Particionamento**: Por created_date
+    **Clustering**: Por customer_segment, country
+  `,
+  bigquery: {
+    partitionBy: "created_date",
+    clusterBy: ["customer_segment", "country"]
+  },
+  tags: ["daily", "core", "critical"],
+
+  assertions: {
+    uniqueKey: ["customer_id"],
+    nonNull: ["customer_id", "email", "created_date"],
+    rowConditions: [
+      "email LIKE '%@%'",
+      "created_date <= CURRENT_DATE()",
+      "customer_segment IN ('PME', 'MEI', 'Autônomo', 'Outros')"
+    ]
+  }
+}
+
+-- =============================================
+-- STAGING: Customers (PostgreSQL → Silver)
+-- =============================================
+
+pre_operations {
+  -- Deletar registros que serão atualizados (para evitar duplicatas)
+  ${when(incremental(),
+    `DELETE FROM ${self()}
+     WHERE customer_id IN (
+       SELECT DISTINCT id
+       FROM ${ref("bronze_postgres", "customers")}
+       WHERE updated_at > (SELECT MAX(updated_at) FROM ${self()})
+     )`
+  )}
+}
+
+-- =============================================
+-- Main Query
+-- =============================================
+
+WITH source AS (
+  SELECT * FROM ${ref("bronze_postgres", "customers")}
+
+  -- Filtro incremental: apenas registros novos/modificados
+  ${when(incremental(),
+    `WHERE updated_at > (SELECT MAX(updated_at) FROM ${self()})`
+  )}
+),
+
+cleaned AS (
+  SELECT
+    -- ========== Primary Keys ==========
+    id AS customer_id,
+
+    -- ========== Dados Pessoais (normalizados) ==========
+    LOWER(TRIM(email)) AS email,
+    INITCAP(TRIM(company_name)) AS company_name,
+    TRIM(legal_name) AS legal_name,
+
+    -- Telefone limpo (apenas números)
+    REGEXP_REPLACE(phone, r'[^0-9]', '') AS phone_clean,
+    phone AS phone_raw,
+
+    -- Documento (CPF/CNPJ)
+    REGEXP_REPLACE(document_number, r'[^0-9]', '') AS document_number,
+    CASE
+      WHEN LENGTH(REGEXP_REPLACE(document_number, r'[^0-9]', '')) = 11 THEN 'CPF'
+      WHEN LENGTH(REGEXP_REPLACE(document_number, r'[^0-9]', '')) = 14 THEN 'CNPJ'
+      ELSE 'UNKNOWN'
+    END AS document_type,
+
+    -- ========== Classificações de Negócio ==========
+    CASE
+      WHEN segment IN ('PME', 'MEI', 'Autônomo') THEN segment
+      ELSE 'Outros'
+    END AS customer_segment,
+
+    COALESCE(country, 'BR') AS country,
+    state,
+    city,
+
+    -- ========== Status e Flags ==========
+    CASE
+      WHEN status = 'active' THEN TRUE
+      ELSE FALSE
+    END AS is_active,
+
+    status AS customer_status,
+
+    -- ========== Timestamps ==========
+    CAST(created_at AS DATE) AS created_date,
+    created_at,
+    updated_at,
+
+    -- ========== Metadados de Lineage ==========
+    'postgres_production' AS _source_system,
+    'datastream_cdc' AS _ingestion_method,
+    CURRENT_TIMESTAMP() AS _loaded_at,
+    '${dataform.projectConfig.vars.environment}' AS _environment
+
+  FROM source
+
+  -- ========== Filtros de Qualidade ==========
+  WHERE email IS NOT NULL
+    AND created_at IS NOT NULL
+    AND id IS NOT NULL
+    AND email LIKE '%@%'  -- Validação básica de email
+
+  -- ========== Deduplicação ==========
+  -- Mantém apenas a versão mais recente de cada customer
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY id
+    ORDER BY updated_at DESC
+  ) = 1
+)
+
+SELECT * FROM cleaned
+
+post_operations {
+  -- Registrar estatísticas da tabela para monitoramento
+  INSERT INTO `${dataform.projectConfig.defaultProject}.metadata.table_statistics` (
+    table_name,
+    row_count,
+    execution_timestamp
+  )
+  VALUES (
+    '${self().schema}.${self().name}',
+    (SELECT COUNT(*) FROM ${self()}),
+    CURRENT_TIMESTAMP()
+  )
+}

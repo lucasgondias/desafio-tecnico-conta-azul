@@ -1,0 +1,13 @@
+{
+  "warehouse": "bigquery",
+  "defaultProject": "conta-azul-prod",
+  "defaultDataset": "silver_core",
+  "defaultLocation": "southamerica-east1",
+  "assertionSchema": "dataform_assertions",
+  "vars": {
+    "environment": "production",
+    "bronze_project": "conta-azul-prod",
+    "silver_project": "conta-azul-prod",
+    "gold_project": "conta-azul-prod"
+  }
+}
