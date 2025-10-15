@@ -40,7 +40,6 @@ wheels/
 .DS_Store
 Thumbs.db
 
-# Claude Code
 .claude/settings.local.json
 
 # Credentials (NEVER commit secrets!)
@@ -67,6 +66,4 @@ INDICE.md
 PERGUNTAS_FREQUENTES_TECNICAS.md
 CHECKLIST_APRESENTACAO.md
 GITHUB_SETUP.md
-CLAUDE.md
 docs/APRESENTACAO.md
-desafio.md

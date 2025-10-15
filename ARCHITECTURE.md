@@ -398,34 +398,6 @@ graph TB
     R3 --> B3
 ```
 
-## Roadmap Visual
-
-```mermaid
-gantt
-    title Roadmap de Implementação (16 semanas)
-    dateFormat  YYYY-MM-DD
-    section Fase 0-1
-    Setup GCP & Infra           :done, f0, 2025-01-01, 2w
-    section Fase 2
-    Ingestão PostgreSQL (CDC)   :active, f2, after f0, 2w
-    section Fase 3
-    Dataform Silver Layer       :f3, after f2, 2w
-    section Fase 4
-    Dataform Gold - Primeiro Mart :f4, after f3, 1w
-    section Fase 5
-    Deploy Looker & Dashboards  :f5, after f4, 1w
-    section Fase 6
-    Qualidade & Observabilidade :f6, after f5, 2w
-    section Fase 7
-    Expansão Fontes (Firebase, SF) :f7, after f6, 2w
-    section Fase 8
-    Product Analytics & DS      :f8, after f7, 1w
-    section Fase 9
-    Governança Completa         :f9, after f8, 1w
-    section Fase 10
-    Otimização & Handoff        :f10, after f9, 3w
-```
-
 ---
 
 ## Notas de Arquitetura

@@ -189,13 +189,6 @@ def test_data_freshness_sla(bq_client):
 
 **50% mais barato** que Snowflake ($1.5k+) ou Databricks ($1.2k+)
 
-### Roadmap: 16 semanas
-- **Semana 8:** Primeiro dashboard (MRR) em produção
-- **Semana 12:** 3 domínios completos (Product, RevOps, DS)
-- **Semana 16:** Governança + handoff
-
-**POC:** 2 semanas (PostgreSQL → Bronze → Silver → Gold → Looker)
-
 ---
 
 ## 8. Resultados Esperados (30s)

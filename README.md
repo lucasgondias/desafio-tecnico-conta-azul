@@ -28,7 +28,6 @@ A solução utiliza **Google Cloud Platform (GCP)** pela sua integração nativa
 7. [Qualidade e Governança](#qualidade-e-governança)
 8. [Camada de Consumo](#camada-de-consumo)
 9. [Estimativa de Custos](#estimativa-de-custos)
-10. [Roadmap de Implementação](#roadmap-de-implementação)
 
 ---
 
@@ -1225,7 +1224,7 @@ def check_pipeline_sla(**context):
         # Enviar alerta crítico
         send_slack_alert(
             channel='#data-alerts',
-            message=f"🚨 SLA BREACH: {len(sla_breaches)} tables estão desatualizadas"
+            message=f"SLA BREACH: {len(sla_breaches)} tables estão desatualizadas"
         )
         raise Exception(f"SLA breach detected: {sla_breaches.to_dict()}")
 
@@ -1899,80 +1898,6 @@ schedule:
 
 ---
 
-## Roadmap de Implementação
-
-### Fase 0: Preparação (Semana 0)
-- [ ] Criar projeto GCP (`conta-azul-prod`)
-- [ ] Configurar billing account e budgets/alerts
-- [ ] Setup IAM roles e service accounts
-- [ ] Criar bucket Cloud Storage (Bronze layer apenas)
-- [ ] Provisionar BigQuery datasets (bronze_*, silver_*, gold_*)
-
-### Fase 1: Foundation (Semanas 1-2)
-- [ ] Deploy Cloud Composer (Airflow) - ambiente Small
-- [ ] Setup Cloud Source Repositories para código
-- [ ] Configurar CI/CD básico (Cloud Build)
-- [ ] Criar estrutura inicial Dataform
-- [ ] Deploy Dataplex para catalogação
-
-### Fase 2: Ingestão - Quick Win (Semanas 3-4)
-**Objetivo**: 1 fonte de dados end-to-end
-
-- [ ] Conectar PostgreSQL produção via Datastream (CDC)
-- [ ] Tabelas prioritárias: customers, invoices, payments, subscriptions
-- [ ] Validar chegada de dados no Bronze (Cloud Storage)
-- [ ] Criar BigLake external tables
-
-### Fase 3: Transformação - Silver Layer (Semanas 5-6)
-- [ ] Dataform: modelos staging para tabelas do PostgreSQL
-- [ ] Implementar deduplicação e limpeza
-- [ ] Testes de qualidade básicos (not null, unique)
-- [ ] DAG Airflow para orquestração Silver
-
-### Fase 4: Transformação - Gold Layer (Semana 7)
-- [ ] Dataform: primeiro mart (`fct_monthly_recurring_revenue`)
-- [ ] Modelos dimensionais (dim_customers)
-- [ ] Documentação inline (descriptions, owners)
-- [ ] Testes de qualidade avançados
-
-### Fase 5: Consumo - BI (Semana 8)
-- [ ] Deploy Looker ou Looker Studio
-- [ ] Criar LookML views para Gold layer
-- [ ] Primeiro dashboard (Revenue Ops Overview)
-- [ ] Treinamento para analistas
-
-### Fase 6: Qualidade & Observabilidade (Semana 9)
-- [ ] Configurar Dataplex Data Quality rules
-- [ ] Implementar testes customizados (pytest)
-- [ ] Cloud Monitoring dashboards
-- [ ] Alertas críticos (SLA, DQ failures)
-
-### Fase 7: Expansão de Fontes (Semanas 10-11)
-- [ ] Adicionar Firebase Analytics export
-- [ ] Conectar Salesforce via Fivetran
-- [ ] Google Analytics 4 → BigQuery
-- [ ] Normalizar para Silver layer
-
-### Fase 8: Product Analytics & Data Science (Semana 12)
-- [ ] Marts de Product Analytics (fct_user_engagement)
-- [ ] Feature store para Data Science
-- [ ] Deploy Vertex AI Workbench
-- [ ] Primeiro modelo BigQuery ML (churn prediction)
-
-### Fase 9: Governança (Semana 13)
-- [ ] Implementar Data Catalog completo
-- [ ] DLP para classificação de PII
-- [ ] Row-Level Security (RLS) por domínio
-- [ ] Políticas de retenção automatizadas
-
-### Fase 10: Otimização & Scale (Semanas 14-16)
-- [ ] Performance tuning (clustering, BI Engine)
-- [ ] Cost optimization audit
-- [ ] Documentação completa (Confluence/Notion)
-- [ ] Handoff para time de Analytics Engineering
-
----
-
 ## Diferenciais da Solução
 
 ### 1. Serverless-First
@@ -2051,7 +1976,3 @@ schedule:
 **Posição**: Analytics Engineer (Especialista)
 **Data**: Outubro 2025
 **Plataforma**: Google Cloud Platform (GCP)
-
----
-
-**Observação**: Esta é uma proposta de arquitetura (desenho da solução). A implementação completa seguiria o roadmap de 16 semanas descrito acima.
